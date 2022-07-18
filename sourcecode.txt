@@ -23,7 +23,7 @@ const string server = "tcp://localhost:3306";
 const string username = "root";
 const string password = "jaisriram";
 fstream f2, f3, f4;
-const auto SCREEN_WIDTH = 150;
+const auto SCREEN_WIDTH = 118;
 
 class member
 {
@@ -168,7 +168,7 @@ int is_a_member(int a)
 	try
 	{
 		driver = get_driver_instance();
-
+		con = driver->connect(server, username, password);
 		con->setSchema("new_data");
 
 		//select  
@@ -206,7 +206,7 @@ int is_booked(int a)
 	try
 	{
 		driver = get_driver_instance();
-
+		con = driver->connect(server, username, password);
 		con->setSchema("new_data");
 
 		pstmt = con->prepareStatement("SELECT * FROM new_data;");
@@ -292,6 +292,8 @@ void show_facility()
 			cout<<i<<"."<<result->getString(1) << endl;
 			i++;
 		}
+		cout << setfill('*') << setw(SCREEN_WIDTH + 1) << " " << setfill(' ')
+			<< endl;
 		delete result;
 		delete pstmt;
 		delete con;
@@ -303,7 +305,7 @@ void show_facility()
 		exit(1);
 	}
 }
-int is_prev(string date,string number)
+int is_prev(string date,int number)
 {
 	sql::Driver* driver;
 	sql::Connection* con;
@@ -315,13 +317,16 @@ int is_prev(string date,string number)
 		driver = get_driver_instance();
 		con = driver->connect(server, username, password);
 		con->setSchema("new_data"); 
-		string query = "SELECT * FROM prev_his WHERE date=" + date + " AND mem_id=" + number + " ;";
+		string query = "SELECT * FROM prev_his ;";
 		pstmt = con->prepareStatement(query);
 		result = pstmt->executeQuery();
 		int found = 0;
 		while (result->next())
 		{
-			found = 1;
+			if(number==result->getInt(1) && date==result->getString(2))
+			{
+				found = 1;
+			}
 		}
 		delete result;
 		delete pstmt;
@@ -356,7 +361,7 @@ void update_prev(int memberid,string date,string facility)
 
 	con->setSchema("new_data");
 	string number = to_string(memberid);
-	if (is_prev(date,number ) == 1)
+	if (is_prev(date,memberid ) == 1)
 	{
 		string query1 = "UPDATE prev_his SET " + facility + " = ? WHERE mem_id = " + number + ";";
 		pstmt = con->prepareStatement(query1);
@@ -366,11 +371,13 @@ void update_prev(int memberid,string date,string facility)
   }
 	else
 	{
+
 		string query3 = "INSERT INTO prev_his(mem_id,date," + facility + ") VALUES(? ,?,?)";
 		pstmt = con->prepareStatement(query3);
 		pstmt->setInt(1, memberid);
 		pstmt->setString(2, date);
 		pstmt->setString(3, facility);
+		pstmt->executeQuery();
 		delete pstmt;
 	}
 	delete con;
@@ -391,6 +398,59 @@ void booking_facility()
 		driver = get_driver_instance();
 		//for demonstration only. never save password in the code!
 		con = driver->connect(server, username, password);
+		con->setSchema("new_data");
+
+		if (is_a_member(number) == 1)
+		{
+			string facility;
+			show_facility();
+			cout << "enter the facility name:";
+			cin >> facility;
+			cout << endl;
+			string date;
+			cout << "enter date(xx:xx:xxxx):";
+			cin >> date;
+
+			if (is_booked(number) == 1)
+			{
+				string time;
+				cout << "enter time slot(xx:xx):";
+				cin >> time;
+
+				string query1 = "UPDATE new_data SET " + facility + " = ? WHERE mem_id = " + str + ";";
+				pstmt = con->prepareStatement(query1);
+				pstmt->setString(1, facility);
+				pstmt->executeQuery();
+				delete pstmt;
+				string query2 = "UPDATE new_data SET " + facility + "time= ? WHERE mem_id = " + str + ";";
+				pstmt = con->prepareStatement(query2);
+				pstmt->setString(1, time);
+				pstmt->executeQuery();
+				delete pstmt;
+			}
+			else
+			{
+				
+				string time;
+				cout << "enter time slot(xx:xx):";
+				cin >> time;
+				string query3 = "INSERT INTO new_data(mem_id,date," + facility + "," + facility + "time) VALUES(? ,?, ? ,?);";
+				pstmt = con->prepareStatement(query3);
+				pstmt->setInt(1, number);
+				pstmt->setString(2, date);
+				pstmt->setString(3, facility);
+				pstmt->setString(4, time);
+				pstmt->executeQuery();
+				delete pstmt;
+
+			}
+			update_prev(number, date, facility);
+		}
+		else
+		{
+			cout << "not registered in this club" << endl;
+		}
+		
 	}
 	catch (sql::SQLException e)
 	{
@@ -398,54 +458,8 @@ void booking_facility()
 		system("pause");
 		exit(1);
 	}
-
-	con->setSchema("new_data");
+	delete con;
 	
-	if (is_a_member(number) == 1)
-	{
-		string facility;
-		show_facility();
-		cin >> facility;
-		cout << endl;
-		string time;
-		cout << "enter time slot(xx:xx):";
-		cin >> time;
-		if (is_booked(number) == 1)
-		{
-
-			string query1 = "UPDATE new_data SET " + facility + " = ? WHERE mem_id = " + str+";";
-			pstmt = con->prepareStatement(query1);
-			pstmt->setString(1, facility);
-			pstmt->executeQuery();
-			delete pstmt;
-			string query2 = "UPDATE new_data SET "+facility+"time= ? WHERE mem_id = " + str + ";";
-			pstmt = con->prepareStatement(query2);
-			pstmt->setString(1, time);
-			pstmt->executeQuery();
-			delete pstmt;
-	   }
-		else
-		{
-			string date;
-			cout << "enter date(xx:xx:xxxx):";
-			cin >> date;
-			string time;
-			cout << "enter time slot(xx:xx):";
-			cin >> time;
-			string query3 = "INSERT INTO new_data(mem_id,date," + facility + ","+facility+"time) VALUES(? ,?, ? ,?)";
-			pstmt = con->prepareStatement(query3);
-			pstmt->setInt(1,number);
-			pstmt->setString(2, date);
-			pstmt->setString(3,facility);
-			pstmt->setString(4, time);
-			delete pstmt;
-
-		}
-	}
-	else
-	{
-		cout << "not registered in this club" << endl;
-	}
 
 
 }
@@ -474,6 +488,8 @@ void display_mem_det()
 			cout << result->getInt(1) << "\t" << result->getString(2).c_str() << "\t" << result->getString(3).c_str() << "\t"
 				<< result->getString(4).c_str() << endl;
 		}
+		cout << setfill('*') << setw(SCREEN_WIDTH + 1) << " " << setfill(' ')
+			<< endl;
 		delete result;
 		delete pstmt;
 		delete con;
@@ -504,27 +520,29 @@ void search_particulars(int a)
 		pstmt = con->prepareStatement("SELECT * FROM new_data  WHERE mem_id = ? ;");
 		pstmt->setInt(1, a);
 		result = pstmt->executeQuery();
-		int x = count_facility();
-		x = 2 + (2 * x) + 1;
-		int i = 1;
+		int x = count_facility()-1;
+		x = 2 + (2 * x)+1;
+		
 		while (result->next())
 		{
-			if (i == x) {
-				break;
+			int i = 1;
+			for (i; i < x; i++)
+			{
+				
+					if (i == 1)
+					{
+						cout << result->getInt(i) << "\t";
+					}
+					else {
+						cout << result->getString(i).c_str() << "\t";
+					}
+				
 			}
-			else {
-				if (i == 1)
-				{
-					cout << result->getInt(i) << "\t";
-				}
-				else {
-					cout << result->getString(i).c_str() << "\t";
-				}
-			}
-			i++;
 		
 		}
-		
+		cout << endl;
+		cout << setfill('*') << setw(SCREEN_WIDTH + 1) << " " << setfill(' ')
+			<< endl;
 		delete result;
 		delete pstmt;
 		delete con;
@@ -592,10 +610,12 @@ void full_summary(int a)
 		int i = 1;
 		while (result->next())
 		{
-			cout << "member id:" << str<<endl;
+			
 			string temp = result->getString(i);
 			cout<<temp<<":" << count_fac(temp, str)<<endl;
 		}
+		cout << setfill('*') << setw(SCREEN_WIDTH + 1) << " " << setfill(' ')
+			<< endl;
 		delete result;
 		delete pstmt;
 		delete con;
@@ -640,15 +660,13 @@ void see_his()
 	pstmt = con->prepareStatement("SELECT * FROM prev_his ;");
 	result = pstmt->executeQuery();
 	int x = count_facility();
-	x = 2 + x + 1;
-	int i = 1;
+	x = 2 + x ;
+	
 	while (result->next())
 	{
-		if (i == x)
+		int i = 1;
+		for(i;i<x;i++)
 		{
-			break;
-		}
-		else {
 			if (i == 1)
 			{
 				cout << result->getInt(i) << "\t";
@@ -658,7 +676,8 @@ void see_his()
 			}
 
 		}
-		i++;
+		cout << endl;
+		
 	}
 	delete pstmt;
 	delete con;
@@ -689,26 +708,27 @@ void see_all_prev()
 	pstmt = con->prepareStatement("SELECT * FROM prev_his WHERE  mem_id=" + str + ";");
 	result = pstmt->executeQuery();
 	int x = count_facility();
-	x = 2 + x + 1;
-	int i = 1;
+	x = 2 + x ;
+	
 	while (result->next())
 	{
-		if (i == x)
-		{
-			break;
-		}
-		else {
+		int i = 1;
+		for(i;i<x;i++)
+		{ 
 			if (i == 1)
 			{
 				cout << result->getInt(i) << "\t";
 			}
-			else {
+			else 
+			{
 				cout << result->getString(i) << "\t";
 			}
 
 		}
-		i++;
+		
+		
 	}
+	cout << endl;
 	delete pstmt;
 	delete con;
 }
@@ -740,7 +760,9 @@ void summary()
 	{
 		int a = 0;
 		a = result->getInt(1);
-		cout << "member id:" << a<<endl<<endl;
+		cout << setfill('*') << setw(SCREEN_WIDTH + 1) << " " << setfill(' ')
+			<< endl;
+		cout << "member id:" << a << endl;
 		full_summary(a);
 	}
 
@@ -781,20 +803,19 @@ void add_facility()
 			cin >> ch;
 			cout << endl;
 		} while (ch == 1);
-		stmt = con->createStatement();
-		string query1 = "ALTER TABLE prev_his ADD " + fac1 + "varchar(50)";
-		stmt->execute(query1);
-		delete stmt;
-		
-		stmt = con->createStatement();
-		string query2 = "ALTER TABLE new_data ADD " + fac1 + "varchar(50)";
-		stmt->execute(query2);
-		delete stmt;
-
-		stmt = con->createStatement();
-		string query1 = "ALTER TABLE new_data ADD " + fac1 + "time " + "varchar(50)";
-		stmt->execute(query1);
-		delete stmt;
+	
+		string query1 = "ALTER TABLE prev_his ADD " + fac1 + " varchar(50)";
+		pstmt = con->prepareStatement(query1);
+		pstmt->executeQuery();
+		delete pstmt;
+		string query2 = "ALTER TABLE new_data ADD " + fac1 + " varchar(50)";
+		pstmt = con->prepareStatement(query2);
+		pstmt->executeQuery();
+		delete pstmt;
+		string query3 = "ALTER TABLE new_data ADD " + fac1 + "time " + " varchar(50)";
+		pstmt = con->prepareStatement(query3);
+		pstmt->executeQuery();
+		delete pstmt;
 
 
 
@@ -812,10 +833,10 @@ void add_facility()
 
 	{
 		int i=0;
-		cout << "1.display all bookings" << endl
+		cout << "1.display all member details" << endl
 			<< "2.search for particular record" << endl
 			<< "3.add facility" << endl
-			<< "4.display all records" << endl << "5.summary of a member" << endl
+			<< "4.display all bookings" << endl << "5.summary of a member" << endl
 			<< "6.go back to main menu" << endl;
 		cin >> i;
 		cout << endl;
@@ -932,8 +953,8 @@ void add_facility()
 	int main()
 	{
 		int ss = 0;
-		
 	
+		
 		
 		
 
